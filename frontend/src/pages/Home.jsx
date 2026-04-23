@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
-import { userDataContext } from '../context/userContext'
+import { userDataContext } from '../context/UserContext'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import aiImg from "../assets/ai.gif"
@@ -17,6 +17,13 @@ function Home() {
   const [ham,setHam]=useState(false)
   const isRecognizingRef=useRef(false)
   const synth=window.speechSynthesis
+  const assistantAliases = [
+    userData?.assistantName,
+    "jarvis",
+    "jervis",
+    "jervish",
+    "jervise"
+  ].filter(Boolean).map(name => name.toLowerCase())
 
   const handleLogOut=async ()=>{
     try {
@@ -46,11 +53,11 @@ function Home() {
 
   const speak=(text)=>{
     const utterence=new SpeechSynthesisUtterance(text)
-    utterence.lang = 'hi-IN';
+    utterence.lang = 'en-US';
     const voices =window.speechSynthesis.getVoices()
-    const hindiVoice = voices.find(v => v.lang === 'hi-IN');
-    if (hindiVoice) {
-      utterence.voice = hindiVoice;
+    const englishVoice = voices.find(v => v.lang === 'en-US');
+    if (englishVoice) {
+      utterence.voice = englishVoice;
     }
 
 
@@ -67,6 +74,10 @@ synth.speak(utterence);
   }
 
   const handleCommand=(data)=>{
+    if (!data?.response) {
+      speak("Sorry, I could not get an answer. Please try again.");
+      return;
+    }
     const {type,userInput,response}=data
       speak(response);
     
@@ -97,6 +108,10 @@ synth.speak(utterence);
 
 useEffect(() => {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    console.error("Speech recognition is not supported in this browser");
+    return;
+  }
   const recognition = new SpeechRecognition();
 
   recognition.continuous = true;
@@ -107,19 +122,7 @@ useEffect(() => {
 
   let isMounted = true;  // flag to avoid setState on unmounted component
 
-  // Start recognition after 1 second delay only if component still mounted
-  const startTimeout = setTimeout(() => {
-    if (isMounted && !isSpeakingRef.current && !isRecognizingRef.current) {
-      try {
-        recognition.start();
-        console.log("Recognition requested to start");
-      } catch (e) {
-        if (e.name !== "InvalidStateError") {
-          console.error(e);
-        }
-      }
-    }
-  }, 1000);
+  let startTimeout;
 
   recognition.onstart = () => {
     isRecognizingRef.current = true;
@@ -163,7 +166,8 @@ useEffect(() => {
 
   recognition.onresult = async (e) => {
     const transcript = e.results[e.results.length - 1][0].transcript.trim();
-    if (transcript.toLowerCase().includes(userData.assistantName.toLowerCase())) {
+    console.log("Transcript:", transcript);
+    if (assistantAliases.some(name => transcript.toLowerCase().includes(name))) {
       setAiText("");
       setUserText(transcript);
       recognition.stop();
@@ -171,15 +175,23 @@ useEffect(() => {
       setListening(false);
       const data = await getGeminiResponse(transcript);
       handleCommand(data);
-      setAiText(data.response);
+      setAiText(data?.response || "Sorry, I could not get an answer. Please try again.");
       setUserText("");
     }
   };
 
 
     const greeting = new SpeechSynthesisUtterance(`Hello ${userData.name}, what can I help you with?`);
-    greeting.lang = 'hi-IN';
-   
+    greeting.lang = 'en-US';
+    isSpeakingRef.current = true;
+    greeting.onend = () => {
+      isSpeakingRef.current = false;
+      startTimeout = setTimeout(() => {
+        if (isMounted) {
+          startRecognition();
+        }
+      }, 800);
+    };
     window.speechSynthesis.speak(greeting);
  
 
@@ -196,7 +208,7 @@ useEffect(() => {
 
 
   return (
-    <div className='w-full h-[100vh] bg-gradient-to-t from-[black] to-[#02023d] flex justify-center items-center flex-col gap-[15px]'>
+    <div className='w-full h-[100vh] bg-gradient-to-t from-[black] to-[#02023d] flex justify-center items-center flex-col gap-[15px] overflow-hidden'>
       <CgMenuRight className='lg:hidden text-white absolute top-[20px] right-[20px] w-[25px] h-[25px]' onClick={()=>setHam(true)}/>
       <div className={`absolute lg:hidden top-0 w-full h-full bg-[#00000053] backdrop-blur-lg p-[20px] flex flex-col gap-[20px] items-start ${ham?"translate-x-0":"translate-x-full"} transition-transform`}>
  <RxCross1 className=' text-white absolute top-[20px] right-[20px] w-[25px] h-[25px]' onClick={()=>setHam(false)}/>
