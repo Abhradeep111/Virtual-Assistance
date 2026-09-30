@@ -1,6 +1,14 @@
 import genToken from "../config/token.js"
 import User from "../models/user.model.js"
 import bcrypt from "bcryptjs"
+
+const cookieOptions={
+    httpOnly:true,
+    maxAge:7*24*60*60*1000,
+    sameSite:process.env.NODE_ENV==="production"?"none":"strict",
+    secure:process.env.NODE_ENV==="production"
+}
+
 export const signUp=async (req,res)=>{
 try {
     const {name,email,password}=req.body
@@ -21,12 +29,7 @@ try {
 
     const token=await genToken(user._id)
 
-    res.cookie("token",token,{
-        httpOnly:true,
-       maxAge:7*24*60*60*1000,
-       sameSite:"strict",
-       secure:false
-    })
+    res.cookie("token",token,cookieOptions)
 
     return res.status(201).json(user)
 
@@ -51,12 +54,7 @@ try {
 
     const token=await genToken(user._id)
 
-    res.cookie("token",token,{
-        httpOnly:true,
-       maxAge:7*24*60*60*1000,
-       sameSite:"strict",
-       secure:false
-    })
+    res.cookie("token",token,cookieOptions)
 
     return res.status(200).json(user)
 
@@ -73,4 +71,3 @@ export const logOut=async (req,res)=>{
          return res.status(500).json({message:`logout error ${error}`})
     }
 }
-        
